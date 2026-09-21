@@ -9,6 +9,9 @@ const resultInfo = document.querySelector('.currency__info.result');
 const sourceRadios = document.querySelectorAll('.radio__input[name="source"]');
 const resultRadios = document.querySelectorAll('.radio__input[name="result"]');
 const swapButton = document.querySelector('.swap-button');
+const conversionStatus = document.querySelector('.conversion-status');
+const apiUrl = import.meta.env.VITE_API_URL || 'https://currency-converter.hopto.org/api/convert/';
+let conversionVersion = 0;
 
 const symbol = {
   'RUB': '₽',
@@ -19,8 +22,18 @@ const symbol = {
 // Получение данных курса
 async function fetchExchangeRate(from, to, amount) {
   const amountWithDot = String(amount).replace(',', '.');
-  const response = await fetch(`https://currency-converter.hopto.org/api/convert?from=${from}&to=${to}&amount=${amountWithDot}`);
-    const data = await response.json();
+  const url = new URL(apiUrl, window.location.href);
+  url.search = new URLSearchParams({ from, to, amount: amountWithDot });
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Conversion request failed');
+  }
+  const data = await response.json();
+  if (!Number.isFinite(data?.result) || data.result < 0 ||
+      !Number.isFinite(data?.info?.rate) || data.info.rate <= 0 ||
+      !Number.isFinite(1 / data.info.rate)) {
+    throw new Error('Invalid conversion response');
+  }
   return data;
 }
 
@@ -77,6 +90,9 @@ function handleInput(event) {
 
 // Обновление данных конвертации
 async function updateConversion(start = 'left') {
+  // Every edit invalidates earlier requests, including edits that clear a field.
+  const version = ++conversionVersion;
+  conversionStatus.textContent = '';
 
   let sourceValue = sourceInput.value.trim();
   let resultValue = resultInput.value.trim();
@@ -97,24 +113,26 @@ async function updateConversion(start = 'left') {
     toCurrency = resultCurrency;
   }
 
- if (!initialValue || initialValue <= 0 || isNaN(initialValue)) {
-   start === 'right' 
-     ? sourceInput.value = '' 
-     : resultInput.value = '';
-   sourceInfo.textContent = '';
-   resultInfo.textContent = '';
-   return;
- }
+  const outputInput = start === 'right' ? sourceInput : resultInput;
+  outputInput.value = '';
+  sourceInfo.textContent = '';
+  resultInfo.textContent = '';
+
+  if (!Number.isFinite(initialValue) || initialValue <= 0) {
+    return;
+  }
 
   if (sourceCurrency === resultCurrency) {
-    resultInput.value = formatValue(initialValue);
+    outputInput.value = formatValue(initialValue);
     sourceInfo.textContent = formatValue(`1 ${symbol[sourceCurrency]} = 1 ${symbol[resultCurrency]}`);
     resultInfo.textContent = formatValue(`1 ${symbol[resultCurrency]} = 1 ${symbol[sourceCurrency]}`);
     return;
   }
 
   try {
+    conversionStatus.textContent = 'Обновляем курс…';
     const data = await fetchExchangeRate(fromCurrency, toCurrency, initialValue);
+    if (version !== conversionVersion) return;
 
     if (start === 'right') {
       sourceInput.value = formatValue(data.result.toFixed(2));
@@ -122,12 +140,14 @@ async function updateConversion(start = 'left') {
       resultInput.value = formatValue(data.result.toFixed(2));
     }
 
-    const rate = data.info.rate;
-    sourceInfo.textContent = formatValue(`1 ${symbol[fromCurrency]} = ${rate.toFixed(2)} ${symbol[toCurrency]}`);
-    resultInfo.textContent = formatValue(`1 ${symbol[toCurrency]} = ${(1 / rate).toFixed(2)} ${symbol[fromCurrency]}`);
+    const rate = start === 'right' ? 1 / data.info.rate : data.info.rate;
+    sourceInfo.textContent = formatValue(`1 ${symbol[sourceCurrency]} = ${rate.toFixed(2)} ${symbol[resultCurrency]}`);
+    resultInfo.textContent = formatValue(`1 ${symbol[resultCurrency]} = ${(1 / rate).toFixed(2)} ${symbol[sourceCurrency]}`);
+    conversionStatus.textContent = '';
   
   } catch (error) {
-    console.error('Ошибка получения данных:', error);
+    if (version !== conversionVersion) return;
+    conversionStatus.textContent = 'Не удалось получить курс. Проверьте соединение и измените сумму, чтобы повторить.';
   }
 }
 

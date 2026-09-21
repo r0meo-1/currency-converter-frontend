@@ -298,3 +298,11 @@ $border-focus-color: rgba(0, 0, 0, 1);
   font-size: 16px;
   line-height: 1.25;
 }
+
+.conversion-status {
+  min-height: 1.5em;
+  margin: 16px 0 0;
+  max-width: 900px;
+  font-family: $font-funnel-sans;
+  line-height: 1.5;
+}
