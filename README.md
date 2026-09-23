@@ -26,12 +26,25 @@ HTML5 · JavaScript ES6 · Sass/SCSS
 ```bash
 git clone https://github.com/r0meo-1/currency-converter-frontend.git
 cd currency-converter-frontend
-# зависимости и скрипты — см. package.json / Makefile в корне
-npm install   # если есть package.json
-npm start     # или open index — как устроено в проекте
+npm ci
+npm run dev
 ```
 
-Укажите URL бэкенда в конфиге окружения (иначе кнопки будут красивыми и бесполезными).
+По умолчанию используется `https://currency-converter.hopto.org/api/convert/`.
+Для другого сервера задайте полный URL endpoint в `.env.local`, например:
+
+```dotenv
+VITE_API_URL=http://localhost:8000/api/convert/
+```
+
+Это публичный адрес, включаемый в сборку. Не добавляйте сюда ключ API.
+Backend должен разрешать CORS для адреса frontend. После изменения переменной
+перезапустите dev-сервер или пересоберите приложение.
+
+`npm test` собирает production bundle и проверяет его в jsdom: быстрый ввод,
+ответы в обратном порядке, очистку полей, смену валют, обратный расчёт и ошибки.
+Запросы заменены управляемыми ответами, внешний сервер не нужен.
+`npm run build` создаёт сборку в `dist`, `npm run preview` открывает её локально.
 
 ---
 
